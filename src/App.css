@@ -8,7 +8,53 @@
    LIGHT MODE THEME
    ======================================== */
 
-   .app.light {
+   .app.light .typography-preview,
+.app.light .typography-preview div,
+.app.light .type-sample,
+.app.light .weight-preview,
+.app.light .line-height-preview,
+.app.light .letter-spacing-preview {
+  color: var(--text-primary) !important;
+}
+
+.app.light .preview-card {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text-primary);
+}
+
+.app.light .preview-card h4,
+.app.light .preview-card p,
+.app.light .preview-card strong {
+  color: var(--text-primary);
+}
+
+.app.light .alert {
+  color: var(--text-primary);
+}
+
+.app.light .alert strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.app.light .component-preview {
+  color: var(--text-primary);
+}
+
+/* Ensure all text in preview is visible */
+.app.light .preview-grid * {
+  color: inherit;
+}
+
+.app.light .preview-button {
+  color: white;
+}
+
+.app.light .preview-button.secondary {
+  color: var(--primary) !important;
+}
+
+.app.light {
     /* Backgrounds */
     --bg-dark: #FFFFFF;
     --bg-darker: #F9FAFB;
@@ -29,6 +75,9 @@
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.15);
   }
   
+
+
+  /* OLD */
   /* Light mode sidebar */
   .app.light .sidebar {
     background: rgba(255, 255, 255, 0.98);
@@ -300,6 +349,41 @@
 .app.light .preview-card-text {
   color: var(--text-secondary);
 }
+
+/* Force all text elements to be dark in light mode */
+.app.light {
+    color: var(--text-primary);
+  }
+  
+  .app.light * {
+    color: inherit;
+  }
+  
+  .app.light h1,
+  .app.light h2,
+  .app.light h3,
+  .app.light h4,
+  .app.light h5,
+  .app.light h6,
+  .app.light p,
+  .app.light span,
+  .app.light div,
+  .app.light label {
+    color: var(--text-primary);
+  }
+  
+  /* Exception for buttons and specific colored elements */
+  .app.light .btn-primary {
+    color: white;
+  }
+  
+  .app.light .preview-button:not(.secondary) {
+    color: white;
+  }
+  
+  .app.light .badge {
+    color: white;
+  }
   
   /* ========================================
      SIDEBAR
@@ -714,17 +798,35 @@
     opacity: 1;
   }
   
+  /* Mobile - always show shade labels */
+  @media (max-width: 768px) {
+    .shade-overlay {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.4);
+    }
+    
+    .shade-name {
+      font-size: 12px;
+    }
+    
+    .shade-hex {
+      font-size: 10px;
+    }
+  }
+  
   .shade-name {
     font-size: 14px;
     font-weight: 700;
     color: white;
     margin-bottom: 4px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
   
   .shade-hex {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.9);
     font-family: 'Menlo', monospace;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
   
   /* ========================================
@@ -796,6 +898,26 @@
   .contrast-badge.error {
     background: rgba(239, 68, 68, 0.2);
     color: #EF4444;
+  }
+
+  .contrast-item {
+    padding: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+  }
+  
+  .contrast-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .contrast-name {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: block;
   }
   
   /* ========================================
@@ -1350,6 +1472,44 @@
     gap: 16px;
   }
   
+  /* Light mode - typography previews */
+.app.light .type-sample {
+    color: var(--text-primary);
+  }
+  
+  .app.light .weight-preview {
+    color: var(--text-primary);
+  }
+  
+  .app.light .line-height-preview {
+    color: var(--text-primary);
+  }
+  
+  .app.light .letter-spacing-preview {
+    color: var(--text-primary);
+  }
+  
+  .app.light .typography-preview {
+    color: var(--text-primary);
+  }
+  
+  .app.light .typography-preview > div {
+    color: var(--text-primary) !important;
+  }
+  
+  /* Light mode - preview card typography */
+  .app.light .preview-card-header h4 {
+    color: var(--text-primary);
+  }
+  
+  .app.light .alert {
+    color: var(--text-primary);
+  }
+  
+  .app.light .alert strong {
+    color: var(--text-primary);
+  }
+
   .alert {
     margin-bottom: 12px;
     font-size: 14px;

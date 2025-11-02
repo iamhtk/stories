@@ -234,6 +234,75 @@ function App() {
     }
   }, [theme])
 
+  // Toast notification state
+const [showToast, setShowToast] = useState(false)
+const [toastMessage, setToastMessage] = useState('')
+const [accessibilityBaseColor, setAccessibilityBaseColor] = useState(null)
+
+// Color history for undo/redo
+const [colorHistory, setColorHistory] = useState([])
+const [historyIndex, setHistoryIndex] = useState(-1)
+
+// Save to history
+const saveToHistory = (newColors) => {
+  const newHistory = colorHistory.slice(0, historyIndex + 1)
+  newHistory.push(JSON.parse(JSON.stringify(newColors)))
+  setColorHistory(newHistory)
+  setHistoryIndex(newHistory.length - 1)
+}
+
+// Undo
+const undo = () => {
+  if (historyIndex > 0) {
+    setHistoryIndex(historyIndex - 1)
+    setColors(JSON.parse(JSON.stringify(colorHistory[historyIndex - 1])))
+    showToastNotification('↶ Undone')
+  }
+}
+
+// Redo
+const redo = () => {
+  if (historyIndex < colorHistory.length - 1) {
+    setHistoryIndex(historyIndex + 1)
+    setColors(JSON.parse(JSON.stringify(colorHistory[historyIndex + 1])))
+    showToastNotification('↷ Redone')
+  }
+}
+
+// Keyboard shortcuts
+useEffect(() => {
+  const handleKeyDown = (e) => {
+    // Undo: Cmd+Z / Ctrl+Z
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault()
+      undo()
+    }
+    // Redo: Cmd+Shift+Z / Ctrl+Shift+Z
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
+      e.preventDefault()
+      redo()
+    }
+  }
+
+  window.addEventListener('keydown', handleKeyDown)
+  return () => window.removeEventListener('keydown', handleKeyDown)
+}, [historyIndex, colorHistory])
+
+// Update history when colors change
+useEffect(() => {
+  if (colors.length > 0) {
+    saveToHistory(colors)
+  }
+}, [colors])
+
+
+// Show toast notification
+const showToastNotification = (message) => {
+  setToastMessage(message)
+  setShowToast(true)
+  setTimeout(() => setShowToast(false), 3000)
+}
+
   // Generate color shades (50-900 like Tailwind)
   const generateShades = (hex) => {
     try {
@@ -618,43 +687,123 @@ function App() {
   }
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true)
+        showToastNotification('✓ Copied to clipboard!')
+        setTimeout(() => setCopied(false), 2000)
+      },
+      (err) => {
+        const textArea = document.createElement('textarea')
+        textArea.value = text
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        try {
+          document.execCommand('copy')
+          setCopied(true)
+          showToastNotification('✓ Copied to clipboard!')
+          setTimeout(() => setCopied(false), 2000)
+        } catch (err) {
+          showToastNotification('✗ Failed to copy')
+        }
+        document.body.removeChild(textArea)
+      }
+    )
   }
 
   // Import design system
   const importDesignSystem = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-
+  
+    // Validate file type
+    if (!file.name.endsWith('.json')) {
+      showToastNotification('✗ Please upload a JSON file')
+      return
+    }
+  
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToastNotification('✗ File too large (max 5MB)')
+      return
+    }
+  
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const imported = JSON.parse(e.target.result)
-        if (imported.colors) {
-          setColors(imported.colors.map((c, i) => ({
+        
+        // Validate structure
+        if (!imported || typeof imported !== 'object') {
+          showToastNotification('✗ Invalid JSON structure')
+          return
+        }
+  
+        // Import colors
+        if (imported.colors && Array.isArray(imported.colors)) {
+          const importedColors = imported.colors.map((c, i) => ({
             ...c,
             id: Date.now() + i,
             shades: c.shades || generateShades(c.hex)
-          })))
+          }))
+          setColors(importedColors)
+          if (importedColors.length > 0) {
+            setSelectedColor(importedColors[0])
+          }
         }
+  
+        // Import typography
         if (imported.typography) {
           if (imported.typography.scale) setTypographyScale(imported.typography.scale)
           if (imported.typography.families) setFontFamilies(imported.typography.families)
           if (imported.typography.weights) setFontWeights(imported.typography.weights)
+          if (imported.typography.lineHeights) setLineHeights(imported.typography.lineHeights)
+          if (imported.typography.letterSpacing) setLetterSpacing(imported.typography.letterSpacing)
         }
-        if (imported.spacing) setSpacingScale(imported.spacing)
+  
+        // Import spacing
+        if (imported.spacing && Array.isArray(imported.spacing)) {
+          setSpacingScale(imported.spacing)
+        }
+  
+        // Import effects
         if (imported.shadows) setShadows(imported.shadows)
         if (imported.borderRadius) setBorderRadius(imported.borderRadius)
+        if (imported.borderWidth) setBorderWidth(imported.borderWidth)
+        if (imported.opacity) setOpacity(imported.opacity)
+        if (imported.zIndex) setZIndex(imported.zIndex)
+        if (imported.transitions) setTransitions(imported.transitions)
+        if (imported.easings) setEasings(imported.easings)
+        if (imported.durations) setDurations(imported.durations)
+  
+        // Import layout
         if (imported.breakpoints) setBreakpoints(imported.breakpoints)
+        if (imported.grid) {
+          if (imported.grid.columns) setColumns(imported.grid.columns)
+          if (imported.grid.gutter) setGutter(imported.grid.gutter)
+          if (imported.grid.margin) setMargin(imported.grid.margin)
+        }
+  
+        showToastNotification('✓ Design system imported successfully!')
+        setCurrentView('palette')
         
-        alert('Design system imported successfully!')
       } catch (error) {
-        alert('Error importing file. Please check the format.')
+        console.error('Import error:', error)
+        showToastNotification('✗ Error importing file. Please check format.')
       }
     }
+    
+    reader.onerror = () => {
+      showToastNotification('✗ Error reading file')
+    }
+    
     reader.readAsText(file)
+    
+    // Reset input
+    event.target.value = ''
   }
 
   // Navigation items
@@ -716,14 +865,19 @@ function App() {
           </motion.button>
           
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="theme-toggle"
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-          </motion.button>
+  whileHover={{ scale: 1.02 }}
+  whileTap={{ scale: 0.98 }}
+  onClick={() => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(newTheme)
+    document.body.classList.toggle('light-mode', newTheme === 'light')
+    document.documentElement.setAttribute('data-theme', newTheme)
+  }}
+  className="theme-toggle"
+>
+  {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+  <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+</motion.button>
         </div>
       </aside>
 
@@ -739,21 +893,59 @@ function App() {
     exit={{ opacity: 0, y: -20 }}
     className="view"
   >
-    <div className="view-header">
-      <div>
-        <h2 className="view-title">Color System</h2>
-        <p className="view-description">Complete color palette with automatic shade generation</p>
-      </div>
+
+<div className="view-header">
+  <div>
+    <h2 className="view-title">Color System</h2>
+    <p className="view-description">Complete color palette with automatic shade generation</p>
+  </div>
+  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+    {/* Undo/Redo */}
+    <div style={{ display: 'flex', gap: '4px' }}>
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={addColor}
-        className="btn-primary"
+        onClick={undo}
+        disabled={historyIndex <= 0}
+        className="btn-icon"
+        title="Undo (Cmd+Z)"
+        style={{ opacity: historyIndex <= 0 ? 0.3 : 1 }}
       >
-        <Plus size={18} />
-        Add Color
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 7v6h6"/>
+          <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
+        </svg>
+      </motion.button>
+      
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={redo}
+        disabled={historyIndex >= colorHistory.length - 1}
+        className="btn-icon"
+        title="Redo (Cmd+Shift+Z)"
+        style={{ opacity: historyIndex >= colorHistory.length - 1 ? 0.3 : 1 }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 7v6h-6"/>
+          <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/>
+        </svg>
       </motion.button>
     </div>
+    
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={addColor}
+      className="btn-primary"
+    >
+      <Plus size={18} />
+      Add Color
+    </motion.button>
+  </div>
+</div>
+
+
 
     {/* AI Generator */}
     <div className="glass card">
@@ -841,43 +1033,101 @@ function App() {
     </div>
 
     {/* Accessibility Checker */}
-    {selectedColor && (
-      <div className="glass card">
-        <div className="card-header">
-          <AlertCircle size={20} />
-          <h3>Accessibility Check</h3>
-        </div>
-        <div className="accessibility-grid">
-          {colors.filter(c => c.id !== selectedColor.id).map(color => {
-            const ratio = getContrastRatio(selectedColor.hex, color.hex)
-            const isAAA = parseFloat(ratio) >= 7
-            const isAA = parseFloat(ratio) >= 4.5
-            
-            return (
-              <div key={color.id} className="contrast-item">
-                <div className="contrast-colors">
-                  <div 
-                    className="contrast-swatch"
-                    style={{ background: selectedColor.hex }}
-                  />
-                  <span className="contrast-vs">vs</span>
-                  <div 
-                    className="contrast-swatch"
-                    style={{ background: color.hex }}
-                  />
-                </div>
-                <div className="contrast-info">
-                  <span className="contrast-ratio">{ratio}:1</span>
-                  <span className={`contrast-badge ${isAAA ? 'success' : isAA ? 'warning' : 'error'}`}>
-                    {isAAA ? 'AAA' : isAA ? 'AA' : 'Fail'}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )}
+<div className="glass card">
+  <div className="card-header">
+    <AlertCircle size={20} />
+    <h3>Accessibility Checker</h3>
+  </div>
+  
+  {/* Color Selector */}
+  <div style={{ marginBottom: '20px' }}>
+    <label style={{ 
+      fontSize: '14px', 
+      color: 'var(--text-secondary)', 
+      marginBottom: '12px',
+      display: 'block'
+    }}>
+      Select base color to check contrast:
+    </label>
+    <div style={{ 
+      display: 'grid', 
+      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', 
+      gap: '12px' 
+    }}>
+      {colors.map(color => (
+        <motion.button
+          key={color.id}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setAccessibilityBaseColor(color)}
+          style={{
+            padding: '12px',
+            background: color.hex,
+            border: accessibilityBaseColor?.id === color.id ? '3px solid white' : '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+            boxShadow: accessibilityBaseColor?.id === color.id ? '0 0 0 4px rgba(168, 85, 247, 0.3)' : 'none'
+          }}
+        >
+          <span style={{ 
+            fontSize: '12px', 
+            fontWeight: '700',
+            color: chroma.contrast(color.hex, '#000000') > 4.5 ? '#000000' : '#FFFFFF'
+          }}>
+            {color.name}
+          </span>
+        </motion.button>
+      ))}
+    </div>
+  </div>
+
+  {/* Contrast Results */}
+  {accessibilityBaseColor ? (
+    <div className="accessibility-grid">
+      {colors.filter(c => c.id !== accessibilityBaseColor.id).map(color => {
+        const ratio = getContrastRatio(accessibilityBaseColor.hex, color.hex)
+        const isAAA = parseFloat(ratio) >= 7
+        const isAA = parseFloat(ratio) >= 4.5
+        
+        return (
+          <div key={color.id} className="contrast-item">
+            <div className="contrast-colors">
+              <div 
+                className="contrast-swatch"
+                style={{ background: accessibilityBaseColor.hex }}
+              />
+              <span className="contrast-vs">vs</span>
+              <div 
+                className="contrast-swatch"
+                style={{ background: color.hex }}
+              />
+            </div>
+            <div className="contrast-info">
+              <span className="contrast-name">{color.name}</span>
+              <span className="contrast-ratio">{ratio}:1</span>
+              <span className={`contrast-badge ${isAAA ? 'success' : isAA ? 'warning' : 'error'}`}>
+                {isAAA ? 'AAA ✓' : isAA ? 'AA ✓' : 'Fail ✗'}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  ) : (
+    <div style={{ 
+      textAlign: 'center', 
+      padding: '40px', 
+      color: 'var(--text-muted)',
+      fontSize: '14px'
+    }}>
+      Select a base color above to check contrast ratios
+    </div>
+  )}
+</div>
   </motion.div>
 )}
 
@@ -1469,11 +1719,12 @@ function App() {
         <div className="typography-preview">
           {typographyScale.slice(0, 6).map((scale, i) => (
             <div 
-              key={i}
-              style={{ 
-                fontSize: scale.pixels,
-                fontWeight: i === 0 ? fontWeights.black : i < 3 ? fontWeights.bold : fontWeights.normal,
-                marginBottom: spacingScale[2]?.pixels
+            key={i}
+            style={{ 
+              fontSize: scale.pixels,
+              fontWeight: i === 0 ? fontWeights.black : i < 3 ? fontWeights.bold : fontWeights.normal,
+              marginBottom: spacingScale[2]?.pixels,
+              color: 'var(--text-primary)'
               }}
             >
               {scale.name}: The quick brown fox jumps
@@ -1483,44 +1734,47 @@ function App() {
       </div>
 
       {/* Alerts */}
-      <div className="glass card">
-        <h3 className="card-title">Alerts</h3>
-        <div className="component-preview">
-          <div 
-            className="alert"
-            style={{ 
-              background: `${colors[3]?.shades[500]}20`,
-              borderLeft: `4px solid ${colors[3]?.shades[500]}`,
-              borderRadius: borderRadius.md,
-              padding: spacingScale[4]?.pixels
-            }}
-          >
-            <strong>Success:</strong> Your action was completed successfully!
-          </div>
-          <div 
-            className="alert"
-            style={{ 
-              background: `${colors[4]?.shades[500]}20`,
-              borderLeft: `4px solid ${colors[4]?.shades[500]}`,
-              borderRadius: borderRadius.md,
-              padding: spacingScale[4]?.pixels
-            }}
-          >
-            <strong>Warning:</strong> Please check your input.
-          </div>
-          <div 
-            className="alert"
-            style={{ 
-              background: `${colors[5]?.shades[500]}20`,
-              borderLeft: `4px solid ${colors[5]?.shades[500]}`,
-              borderRadius: borderRadius.md,
-              padding: spacingScale[4]?.pixels
-            }}
-          >
-            <strong>Error:</strong> Something went wrong!
-          </div>
-        </div>
-      </div>
+<div className="glass card">
+  <h3 className="card-title">Alerts</h3>
+  <div className="component-preview">
+    <div 
+      className="alert"
+      style={{ 
+        background: `${colors[3]?.shades[500]}20`,
+        borderLeft: `4px solid ${colors[3]?.shades[500]}`,
+        borderRadius: borderRadius.md,
+        padding: spacingScale[4]?.pixels,
+        color: 'var(--text-primary)'
+      }}
+    >
+      <strong style={{ color: 'var(--text-primary)' }}>Success:</strong> Your action was completed successfully!
+    </div>
+    <div 
+      className="alert"
+      style={{ 
+        background: `${colors[4]?.shades[500]}20`,
+        borderLeft: `4px solid ${colors[4]?.shades[500]}`,
+        borderRadius: borderRadius.md,
+        padding: spacingScale[4]?.pixels,
+        color: 'var(--text-primary)'
+      }}
+    >
+      <strong style={{ color: 'var(--text-primary)' }}>Warning:</strong> Please check your input.
+    </div>
+    <div 
+      className="alert"
+      style={{ 
+        background: `${colors[5]?.shades[500]}20`,
+        borderLeft: `4px solid ${colors[5]?.shades[500]}`,
+        borderRadius: borderRadius.md,
+        padding: spacingScale[4]?.pixels,
+        color: 'var(--text-primary)'
+      }}
+    >
+      <strong style={{ color: 'var(--text-primary)' }}>Error:</strong> Something went wrong!
+    </div>
+  </div>
+</div>
 
       {/* Badges */}
       <div className="glass card">
@@ -1632,8 +1886,39 @@ function App() {
     </div>
   </motion.div>
 )} 
+
         </AnimatePresence>
+        
       </main>
+      
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              background: 'var(--primary)',
+              color: 'white',
+              padding: '16px 24px',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+              zIndex: 10000,
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            {toastMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   )
 }
